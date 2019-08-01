@@ -1,0 +1,106 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: prometheus
+rules:
+  - verbs: ["get", "list", "watch"]
+    apiGroups: [""]
+    resources:
+      - nodes
+      - nodes/proxy
+      - services
+      - endpoints
+      - pods
+  - verbs: ["get", "list", "watch"]
+    apiGroups:
+      - extensions
+    resources:
+      - ingresses
+  - verbs: ["get"]
+    nonResourceURLs: ["/metrics"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: &name prometheus
+roleRef:
+  name: *name
+  kind: ClusterRole
+  apiGroup: rbac.authorization.k8s.io
+subjects:
+  - name: default
+    namespace: monitoring
+    kind: ServiceAccount
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: &name prometheus
+  namespace: monitoring
+  labels:
+    name: *name
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      name: *name
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+  template:
+    metadata:
+      labels:
+        name: *name
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+    spec:
+      containers:
+        - name: prometheus
+          image: quay.io/prometheus/prometheus:v2.11.1
+          imagePullPolicy: IfNotPresent
+          command:
+            - /bin/prometheus
+          args:
+            - --config.file=/etc/prometheus/prometheus-config.yaml
+            - --storage.tsdb.path=/prometheus
+            - --storage.tsdb.retention=24h
+          ports:
+            - name: prometheus
+              protocol: TCP
+              containerPort: 9090
+          resources:
+            limits:
+              cpu: 500m
+              memory: 2500Mi
+            requests:
+              cpu: 100m
+              memory: 100Mi
+          volumeMounts:
+            - mountPath: /prometheus
+              name: data
+            - mountPath: /etc/prometheus
+              name: config-volume
+      restartPolicy: Always
+      terminationGracePeriodSeconds: 30
+      volumes:
+        - name: data
+        - configMap:
+            name: prometheus-config
+          name: config-volume
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: &name prometheus
+  namespace: monitoring
+spec:
+  type: NodePort
+  selector:
+    name: *name
+  ports:
+    - name: prometheus
+      protocol: TCP
+      port: 9090

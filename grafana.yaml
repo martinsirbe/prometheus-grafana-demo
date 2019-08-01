@@ -1,0 +1,56 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: &name grafana
+  namespace: monitoring
+  labels:
+    name: *name
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      name: *name
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        name: *name
+    spec:
+      containers:
+        - name: grafana
+          image: grafana/grafana:6.2.5
+          imagePullPolicy: IfNotPresent
+          ports:
+            - protocol: TCP
+              containerPort: 3000
+          resources:
+            limits:
+              cpu: 500m
+              memory: 2500Mi
+            requests:
+              cpu: 100m
+              memory: 100Mi
+          volumeMounts:
+            - mountPath: /var/lib/grafana
+              name: data
+      restartPolicy: Always
+      terminationGracePeriodSeconds: 30
+      volumes:
+        - name: data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: &name grafana
+  namespace: monitoring
+spec:
+  type: NodePort
+  selector:
+    name: *name
+  ports:
+    - protocol: TCP
+      port: 3000

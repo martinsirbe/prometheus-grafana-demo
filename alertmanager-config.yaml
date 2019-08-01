@@ -1,0 +1,12 @@
+global:
+  resolve_timeout: 1h
+templates:
+  - '/etc/alertmanager/template/*.tmpl'
+receivers:
+  - name: dummy
+route:
+  group_by: ['alertname', 'cluster', 'service']
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 3h
+  receiver: dummy

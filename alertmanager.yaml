@@ -1,0 +1,43 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: &name alertmanager
+  namespace: monitoring
+spec:
+  type: NodePort
+  selector:
+    name: *name
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 9093
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: &name alertmanager
+  namespace: monitoring
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      name: *name
+  template:
+    metadata:
+      labels:
+        name: *name
+    spec:
+      containers:
+        - name: alertmanager
+          image: prom/alertmanager:v0.18.0
+          args:
+            - --config.file=/etc/monitoring/alertmanager-config.yaml
+          ports:
+            - containerPort: 9093
+          volumeMounts:
+            - name: alertmanager-config
+              mountPath: /etc/monitoring
+      volumes:
+        - name: alertmanager-config
+          configMap:
+            name: alertmanager-config
